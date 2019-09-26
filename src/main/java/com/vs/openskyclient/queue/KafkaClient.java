@@ -1,8 +1,8 @@
 package com.vs.openskyclient.queue;
 
-public class KafkaClient {
+import org.opensky.model.StateVector;
 
-    public void putIntoQueue() {
+public interface KafkaClient {
 
-    }
+    void send(StateVector message);
 }

@@ -1,0 +1,10 @@
+opensky:
+  api:
+    username: xinob
+    password: airMAX90
+
+kafka:
+  server: serverNameHere
+  producer:
+    id: producerIdHere
+  topic: topicNameHere
