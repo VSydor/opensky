@@ -4,7 +4,7 @@ opensky:
     password: airMAX90
 
 kafka:
-  server: serverNameHere
+  server: localhost:9093
   producer:
-    id: producerIdHere
-  topic: topicNameHere
+    id: 1
+  topic: test

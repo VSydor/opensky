@@ -2,6 +2,7 @@ package com.vs.openskyclient.service.impl;
 
 import com.vs.openskyclient.queue.KafkaClient;
 import com.vs.openskyclient.service.OpenSkyService;
+import org.glassfish.jersey.internal.guava.Lists;
 import org.opensky.api.OpenSkyApi;
 import org.opensky.model.OpenSkyStates;
 import org.opensky.model.StateVector;
@@ -9,7 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,14 +29,14 @@ public class OpenSkyServiceImpl implements OpenSkyService {
     KafkaClient kafkaClient;
 
     @Override
-    public OpenSkyStates getStates(int time, String[] icao24) {
+    public OpenSkyStates getStates(int time, String[] icao24, String originCountry) {
         OpenSkyStates states = new OpenSkyStates();
         try {
             states = openSkyApi.getStates(time, icao24);
             LOGGER.info("Got {} states.", states.getStates().size());
 
             // Sending to kafka
-            sendToKafka(states);
+            sendToKafka(states, originCountry);
 
         } catch (Exception e) {
             LOGGER.error("Oops! Something went wrong!", e);
@@ -41,23 +44,29 @@ public class OpenSkyServiceImpl implements OpenSkyService {
         return states;
     }
 
-    private void sendToKafka(OpenSkyStates states) {
-        if (states == null) {
-            LOGGER.info("Have nothing to send!");
-            return;
-        }
-        // TODO: add filtering here?
-        List<StateVector> austrian = states.getStates()
-                .stream().parallel()
-                .filter(s -> s.getOriginCountry().equals("Austria"))
-                .collect(Collectors.toList());
+    private void sendToKafka(OpenSkyStates states, String originCountry) {
 
-        if (austrian.isEmpty()) {
-            LOGGER.info("Have no Austria planes to send!");
+        // Filter states using given origin country
+        List<StateVector> toSend = filter(states.getStates(), originCountry);
+
+        if (toSend.isEmpty()) {
+            LOGGER.info("Have no data to send!");
             return;
         }
 
-        austrian.forEach(kafkaClient::send);
-        LOGGER.info("Sent {} items to Kafka.", austrian.size());
+        toSend.forEach(kafkaClient::send);
+        LOGGER.info("Sent {} items to Kafka.", toSend.size());
+    }
+
+    private List<StateVector> filter(Collection<StateVector> collection, String originCountry) {
+        List<StateVector> filtered = Lists.newArrayList(collection);
+        if (!StringUtils.isEmpty(originCountry)) {
+            LOGGER.info("Filtering data using origin '{}'!", originCountry);
+            filtered = collection
+                    .stream().parallel()
+                    .filter(s -> s.getOriginCountry().equalsIgnoreCase(originCountry))
+                    .collect(Collectors.toList());
+        }
+        return filtered;
     }
 }
